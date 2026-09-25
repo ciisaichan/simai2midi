@@ -1,0 +1,26 @@
+# ===== 系统 / 本机 =====
+.DS_Store
+Thumbs.db
+
+# ===== Python 缓存 =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ===== 生成的 MIDI 输出 =====
+out/
+
+# ===== 参考用的第三方源码（非本项目）=====
+# 开源 simai 编辑器 MajdataViewX 的克隆，仅用于参考解析方式
+MajdataViewX/
+
+# ===== 测试谱面数据（非源码/文档）=====
+# maimai 谱面，可从 adxdls.saop.cc 重新下载；如需跟踪请删除下面这行
+samples/
+
+# ===== 编辑器 / IDE =====
+.idea/
+.vscode/
+*.swp
+*~
