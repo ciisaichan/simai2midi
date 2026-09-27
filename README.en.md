@@ -13,11 +13,10 @@ count, and print".**
 
 [![Demo video](docs/demo-poster.png)](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)
 
-▶ **[Watch the demo](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)**
-(*インターネットサバイバー* Master, 56 s, 1080p60, 31 MB — shipped as a release asset, so the repository stays small)
+▶ **[Watch the demo (demo.mp4, 31 MB)](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)**
 
-> To get an inline player on GitHub: drag `demo.mp4` into an issue or
-> comment box, then paste the URL GitHub gives you into the README.
+*インターネットサバイバー* Master ｜ 56 s ｜ 1920×1080 / 60fps
+
 
 #### Demo video credits
 

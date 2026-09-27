@@ -11,11 +11,10 @@
 
 [![演示视频](docs/demo-poster.png)](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)
 
-▶ **[观看演示视频](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)**
-（*インターネットサバイバー* Master，56 秒 / 1080p60 / 31 MB —— 作为 Release 附件提供，仓库不带大文件）
+▶ **[观看演示视频（demo.mp4，31 MB）](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)**
 
-> 想让视频在仓库里直接内嵌播放：把 `demo.mp4` 拖进 GitHub 的 Issue 或评论框，
-> GitHub 会返回一个可播放的链接，把它贴进 README 即可。
+*インターネットサバイバー* Master ｜ 56 秒 ｜ 1920×1080 / 60fps
+
 
 #### 演示视频素材来源
 
