@@ -5,15 +5,18 @@
     python simai2midi.py maidata.txt -d 4 -o out.mid
     python simai2midi.py maidata.txt --all          # 导出全部难度
     python simai2midi.py inote.simai --bpm 174 --first 1.234
+    python simai2midi.py maidata.txt --all --musicxml --pdf   # 附带节奏谱
 """
 from __future__ import annotations
 
 import argparse
 import os
 import sys
+import tempfile
 from typing import Dict, List, Optional, Tuple
 
 import midi_writer
+import score_writer
 import simai_parser
 
 DIFF_NAMES = {
@@ -101,6 +104,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resample", type=_resample_spec, default=None, metavar="S/T",
                    help="把 S 分音及更密集的连续音符重采样到 T 分音"
                         "（如 32/16 将 32 分降为 16 分；默认不处理）")
+    p.add_argument("--musicxml", action="store_true",
+                   help="同时导出 MusicXML 乐谱（*.musicxml）")
+    p.add_argument("--pdf", action="store_true",
+                   help="同时导出乐谱 PDF（*.pdf，由 MusicXML 渲染）")
+    p.add_argument("--time-sig", default="4/4", metavar="N/D",
+                   help="乐谱拍号（默认 4/4）")
+    p.add_argument("--score-grid", type=int, default=score_writer.DEFAULT_GRID_DIV,
+                   metavar="N",
+                   help="乐谱量化网格，N 为分音分母（默认 192=10 tick；"
+                        "192=64×3 能同时精确表示 32 分与三连 16 分，"
+                        "换成 64 会写错三连音时值；0=不量化，可能无法记谱）")
+    p.add_argument("--score-note-div", type=int,
+                   default=score_writer.DEFAULT_NOTE_DIV, metavar="N",
+                   help="谱面短符头时值，N 为分音分母（默认 8=八分音符；"
+                        "16 更短、休止符更多）")
+    p.add_argument("--score-binary", action="store_true",
+                   help="乐谱只用二进制时值（不写 <time-modification> 连音），"
+                        "拍点吸附到 128 分网格（误差 ≤7.5 tick ≈6ms）。"
+                        "music21 生成的连音记谱是补丁式的、连音组不合法，"
+                        "默认路径已按拍整组重写、能同时满足 MuseScore 与连音记号；"
+                        "此选项是最后的逃生通道：完全不写连音，代价是三连音被展开")
     p.add_argument("--velocity", type=int, default=100, help="普通音符力度")
     p.add_argument("--break-velocity", type=int, default=127,
                    help="BREAK 音符力度")
@@ -108,9 +132,89 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def score_meta(data: Dict[str, str], slot: int, title: str) -> Dict[str, str]:
+    """从 maidata 组装节奏谱的标题块。
+
+    主标题=曲名，副标题=「Lv.13.7 ReMaster」，左侧=谱师，右侧=曲作者。
+    """
+    level = data.get(f"lv_{slot}", "").strip() if slot else ""
+    diff = DIFF_NAMES.get(slot, "")
+    if level and diff:
+        subtitle = f"Lv.{level} {diff}"
+    else:
+        subtitle = level or diff
+    designer = data.get(f"des_{slot}", "").strip() if slot else ""
+    return {
+        "title": title,
+        "subtitle": subtitle,
+        "composer": data.get("artist", "").strip(),
+        "designer": f"譜面: {designer}" if designer else "",
+    }
+
+
+def export_score(result: simai_parser.ParseResult, args,
+                 mid_path: str, meta: Dict[str, str]) -> List[str]:
+    """按需导出 MusicXML / PDF 乐谱；返回额外产物路径列表。"""
+    if not (args.musicxml or args.pdf):
+        return []
+    try:
+        time_sig = score_writer.parse_time_sig(args.time_sig)
+    except ValueError as exc:
+        raise SystemExit(f"--time-sig 无效：{exc}")
+
+    base = os.path.splitext(mid_path)[0]
+    note_div = args.score_note_div or score_writer.DEFAULT_NOTE_DIV
+    try:
+        if note_div <= 0:
+            raise ValueError(f"分音分母必须为正整数，得到 {note_div!r}")
+        grid = score_writer.grid_from_div(args.score_grid)
+    except ValueError as exc:
+        raise SystemExit(f"乐谱参数无效：{exc}")
+    hits = score_writer.collect_hits(result.notes, tails=args.tails)
+    score = score_writer.build_score(hits, result.bpm_changes,
+                                     title=meta.get("title", ""),
+                                     subtitle=meta.get("subtitle", ""),
+                                     composer=meta.get("composer", ""),
+                                     designer=meta.get("designer", ""),
+                                     time_sig=time_sig,
+                                     grid_ticks=grid,
+                                     note_div=note_div,
+                                     binary_only=getattr(args, "score_binary",
+                                                         False))
+
+    produced: List[str] = []
+    # MusicXML 的 <volume> 是 0–100 的百分比；MuseScore 从 MIDI 导入时
+    # 用 velocity/127*100 填（velocity 100 → 78.7402），这里照做。
+    volume = args.velocity / 127 * 100
+    xml_path = f"{base}.musicxml"
+    if args.musicxml:
+        score_writer.save_musicxml(score, xml_path, volume=volume)
+        produced.append(xml_path)
+
+    if args.pdf:
+        pdf_path = f"{base}.pdf"
+        if args.musicxml:
+            source = xml_path
+        else:  # PDF 单独用时，MusicXML 只是中间产物
+            handle, source = tempfile.mkstemp(prefix="simai-score-",
+                                              suffix=".musicxml")
+            os.close(handle)
+            score_writer.save_musicxml(score, source, volume=volume)
+        try:
+            score_writer.render_pdf(source, pdf_path, header=meta)
+        except (RuntimeError, OSError) as exc:
+            raise SystemExit(f"渲染 PDF 失败：{exc}")
+        finally:
+            if not args.musicxml and os.path.exists(source):
+                os.unlink(source)
+        produced.append(pdf_path)
+    return produced
+
+
 def convert_one(body: str, slot: int, args, data: Dict[str, str],
-                out_path: str) -> Tuple[int, int, simai_parser.ParseResult]:
-    """转换单个难度。返回 (原始音符数, 合并后音符数, ParseResult)。"""
+                out_path: str) -> Tuple[int, int, simai_parser.ParseResult,
+                                        List[str]]:
+    """转换单个难度。返回 (原始音符数, 重采样后音符数, ParseResult, 乐谱产物)。"""
     first = 0.0
     if not args.no_offset:
         if args.first is not None:
@@ -147,7 +251,9 @@ def convert_one(body: str, slot: int, args, data: Dict[str, str],
         title=label)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     midi_writer.save_midi(mf, out_path)
-    return original, len(result.notes), result
+    produced = export_score(result, args, out_path,
+                            score_meta(data, slot, title))
+    return original, len(result.notes), result, produced
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -167,10 +273,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             suffix = f"_{DIFF_NAMES.get(slot, 'chart')}" if slot else ""
             out_path = os.path.join(args.outdir,
                                     f"{_safe(title)}{suffix}.mid")
-        original, count, result = convert_one(chart_body, slot, args, data,
-                                              out_path)
+        original, count, result, produced = convert_one(chart_body, slot, args,
+                                                        data, out_path)
         if args.quiet:
-            print(out_path)
+            for path in [out_path] + produced:
+                print(path)
             continue
         kinds: Dict[str, int] = {}
         for n in result.notes:
@@ -184,6 +291,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"{out_path}: {count} notes / {hits} 拍手点{merged} ({detail}), "
               f"时长 {result.end_time:.2f}s, "
               f"BPM 段 {len(result.bpm_changes)}")
+        for path in produced:
+            print(f"   乐谱: {path}")
         for w in result.warnings[:10]:
             print(f"  警告: {w}", file=sys.stderr)
         if len(result.warnings) > 10:

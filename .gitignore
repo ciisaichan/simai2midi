@@ -11,6 +11,11 @@ __pycache__/
 # ===== 生成的 MIDI 输出 =====
 out/
 
+# ===== 演示视频 =====
+# 31 MB，作为 GitHub Release 附件发布，不进仓库
+# （README 里引用 https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4）
+docs/demo.mp4
+
 # ===== 参考用的第三方源码（非本项目）=====
 # 开源 simai 编辑器 MajdataViewX 的克隆，仅用于参考解析方式
 MajdataViewX/

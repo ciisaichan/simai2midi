@@ -1,0 +1,10 @@
+# 导出 MusicXML / PDF 节奏谱时才需要的依赖。
+# 只导 MIDI 的话装 requirements.txt 就够了（本文件会连带装上它）。
+#
+# macOS 上 cairosvg 还需要系统 libcairo：brew install cairo
+#   （装完若报 "no library called cairo-2 was found"，见 README 的常见问题）
+-r requirements.txt
+music21>=9.0
+verovio>=4.0
+cairosvg>=2.7
+pypdf>=4.0

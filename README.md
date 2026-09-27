@@ -1,77 +1,169 @@
-# simai2midi
+# simai2midi — maimai 谱面转打击乐节奏谱
 
-把 maimai 街机谱面（simai 记谱 / maidata.txt）转换为打击乐 MIDI。
-所有音符默认映射到 GM 打击乐通道的 Hand Clap（拍手，note 39）。
+把 **maimai（舞萌 DX）的 simai 谱面**转换成三样东西：
 
-## 环境
+1. **打击乐 MIDI** —— 每一记对应一次拍手（GM 打击乐通道 9 / Hand Clap 39），
+   可直接当节奏参考轨、练习素材，或喂给 DAW 与制谱软件
+2. **MusicXML 节奏谱** —— 打击乐单线谱，一个符头 = 一记，**MuseScore 可直接打开**
+3. **PDF 节奏谱** —— 由 MusicXML 排版渲染，适合打印或分享
+
+一句话用途：**把「屏幕上的谱面」变成「能听、能打、能打印的节奏轨」。**
+
+[![演示视频](docs/demo-poster.png)](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)
+
+▶ **[观看演示视频](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)**
+（*インターネットサバイバー* Master，56 秒 / 1080p60 / 31 MB —— 作为 Release 附件提供，仓库不带大文件）
+
+> 想让视频在仓库里直接内嵌播放：把 `demo.mp4` 拖进 GitHub 的 Issue 或评论框，
+> GitHub 会返回一个可播放的链接，把它贴进 README 即可。
+
+#### 演示视频素材来源
+
+| 画面位置 | 内容 | 来源 |
+| --- | --- | --- |
+| 左侧 | 手元（实机游玩） | [bilibili BV1qjztYVE4W](https://www.bilibili.com/video/BV1qjztYVE4W) |
+| 右上 | 游戏谱面 | [bilibili BV1kU421d74K](https://www.bilibili.com/video/BV1kU421d74K/) |
+| 右下 | 节奏谱（本项目生成的 MIDI） | 用 **MuseScore 4** 播放 |
+
+画面素材版权归原作者与 SEGA 所有，此处仅用于功能演示；音频已做衰减处理。
+
+## 特性
+
+- **纯 Python**，无编译步骤；只要导 MIDI 的话仅需 `mido` 一个依赖
+- **完整 simai 解析**：TAP / HOLD / SLIDE / TOUCH / BREAK / EX，含扫键（`- > < ^ v p q s z pp qq V w`）、
+  `{div}` 分音、`(bpm)` 变速、`{#秒}` 时长、EACH / 伪 EACH、`&first` 起始偏移
+- **正确的时间轴**：支持谱面中途变速。秒 → tick 做分段线性映射，
+  变速之后的时间仍然是绝对对齐的
+- **可选的密集度控制**：尾判音（`--tails`）、滑星沿途展开（`--slide-dense`）、
+  连续音符重采样（`--resample 32/16`）
+- **能打开的乐谱**：按**拍**整组生成合法连音组（保留「3」的轮廓，又不会让
+  MuseScore 报「不完整小节」）。这是本项目最花力气的地方，细节见
+  [技术笔记](docs/README.original.md)
+- **自带校验**：回读 MIDI 与源谱逐音比对；乐谱有七项结构不变量检查
+
+## 安装
+
+需要 **Python 3.9 或更新**。
 
 ```bash
-conda activate base   # 需要 mido
+git clone https://github.com/ciisaichan/simai2midi.git
+cd simai2midi
+
+pip install -r requirements.txt          # 只导 MIDI：仅需 mido
+pip install -r requirements-score.txt    # 还要导出 MusicXML / PDF
 ```
 
-## 用法
+macOS 上 `cairosvg` 需要系统 libcairo：
 
 ```bash
-# 默认导出最高难度
+brew install cairo
+```
+
+## 快速开始
+
+```bash
+# 默认导出文件内最高难度
 python simai2midi.py maidata.txt -o out.mid
 
 # 指定难度槽位（1=Easy 2=Basic 3=Advanced 4=Expert 5=Master 6=ReMaster 7=UTAGE）
-python simai2midi.py maidata.txt -d 4 -o expert.mid
+python simai2midi.py maidata.txt -d 6 -o remaster.mid
 
-# 导出全部难度到目录（按 曲名_难度.mid 命名）
+# 一次导出全部难度（按 曲名_难度.mid 命名）
 python simai2midi.py maidata.txt --all -O out/
 
-# 裸 inote 正文（无 & 头部的文件），需手动给 BPM 与偏移
+# 连乐谱一起导出
+python simai2midi.py maidata.txt --all -O out/ --musicxml --pdf
+
+# 裸 inote 正文（没有 & 头部），手动给 BPM 与起始偏移
 python simai2midi.py inote.simai --bpm 174 --first 1.234 -o out.mid
+
+# 更密集的滚奏：滑星沿途每个按钮都算一记
+python simai2midi.py maidata.txt -d 6 --slide-dense
+
+# 把 32 分及更密的连续音符重采样到 16 分
+python simai2midi.py maidata.txt -d 6 --resample 32/16
 ```
 
-主要选项：
+`input` 可以是 `maidata.txt`（含 `&inote_x=` 段落），也可以是只有谱面正文的裸文本文件。
 
-| 选项 | 说明 |
+## 命令行参数
+
+| 参数 | 说明 |
 | --- | --- |
-| `--first SEC` / `--no-offset` | 覆盖 / 忽略 `&first` 起始偏移 |
+| `input` | `maidata.txt` 或裸 inote 正文文件 |
+| `-o, --output PATH` | 输出 `.mid` 路径（单难度时有效） |
+| `-O, --outdir DIR` | 批量输出目录 |
+| `-d, --difficulty N` | 难度槽位 1–7，可重复；默认取最高难度 |
+| `--all` | 导出文件内全部难度 |
 | `--bpm N` | 正文未写 `(bpm)` 时的默认 BPM（默认读 `&wholebpm`，否则 120） |
+| `--first SEC` / `--no-offset` | 覆盖 / 忽略 `&first` 起始偏移 |
 | `--distinct` | 按音符类型分配不同打击音色，便于在 DAW 里区分 |
 | `--hold-sustain` | HOLD / TOUCH HOLD 按真实时长持续（默认短促一击） |
+| `--slide-dense` | 滑星弧线（`> < ^`）展开沿途每个按钮（更密集的滚奏） |
 | `--tails` | 包含 HOLD / SLIDE 的尾判音（默认不含） |
-| `--slide-dense` | 滑星弧线（`>` `<` `^`）展开沿途每个按钮（更密集的滚奏） |
-| `--resample S/T` | 把 S 分音及更密集的连续音符重采样到 T 分音（如 32/16；默认不处理） |
-| `--velocity` / `--break-velocity` | 力度（默认 100 / 127） |
+| `--resample S/T` | 把 S 分音及更密集的连续音符重采样到 T 分音（如 `32/16`；默认不处理） |
+| `--musicxml` | 同时导出节奏谱 MusicXML（`*.musicxml`） |
+| `--pdf` | 同时导出节奏谱 PDF（`*.pdf`，由 MusicXML 渲染） |
+| `--time-sig N/D` | 乐谱拍号（默认 `4/4`） |
+| `--score-grid N` | 乐谱量化网格，N 为分音分母（默认 `192`=10 tick；能同时精确表示 32 分与三连 16 分。改成 `64` 会写错三连音时值） |
+| `--score-note-div N` | 谱面短符头时值，N 为分音分母（默认 `8`=八分音符；`16` 更短、休止符更多） |
+| `--score-binary` | 逃生通道：乐谱完全不写连音，拍点吸附到 128 分网格。代价是三连音被展开成等值音符 |
+| `--velocity V` / `--break-velocity V` | 普通 / BREAK 音符力度（默认 100 / 127） |
+| `-q, --quiet` | 只输出结果路径 |
 
 ### 节奏命中（拍手点）与尾判
 
 解析器把每个音符展开成若干「拍手点」：
 
 - TAP / TOUCH：1 点（头）
-- HOLD / TOUCH HOLD：1 点（头）；`--tails` 时再加尾判（结束时刻）
-- SLIDE：头 + 经过键（连结 SLIDE 的中间键、大 V 的 via）；`--tails` 时再加终点尾判
+- HOLD / TOUCH HOLD：1 点（头）；加 `--tails` 时再加尾判（结束时刻）
+- SLIDE：头 + 经过键（连结 SLIDE 的中间键、大 V 的 via）；加 `--tails` 时再加终点尾判
 
-默认（不含尾判）导出的是一份「纯打击节奏」——与游戏判定里每个
-需要按下的时刻对应；加上 `--tails` 后，HOLD 的离手点与 SLIDE 的到达点
-也会变成一拍，更贴近游戏判定节奏的完整形态。
+默认（不含尾判）导出的是一份**纯打击节奏**——与游戏判定里每个需要按下的时刻对应。
 
-`--distinct` 的音色分配：TAP=39 拍手、HOLD=56 牛铃、SLIDE=54 铃鼓、
-TOUCH=42 闭合踩镲、TOUCH HOLD=46 开放踩镲、BREAK=49 碰铃。
+### DISTINCT 音色映射
+
+加 `--distinct` 后按音符类型分轨到不同打击乐器，方便在 DAW 里一眼区分：
+
+| 音符 | 打击乐 | MIDI 音高 |
+| --- | --- | --- |
+| TAP | Hand Clap | 39 |
+| HOLD | Cowbell | 56 |
+| SLIDE | Tambourine | 54 |
+| TOUCH | Closed Hi-Hat | 42 |
+| TOUCH HOLD | Open Hi-Hat | 46 |
+| BREAK | Crash Cymbal 1 | 49 |
+
+不加时全部用 Hand Clap（39）。
 
 ### 扫键重采样（`--resample S/T`）
 
-maimai 谱面里的「扫键」是一串快速连续音符（32 分、64 分等），实际演奏时
-是扫过而非逐个敲击。`--resample S/T` 会把「S 分音及更密集」的连续音符
-**重采样到 T 分音**：密集段内按 T 分网格（相对段首）每隔一段保留一拍，
-既简化了节奏，又比「只留第一个」保留更多节拍参考。
+maimai 里的「扫键」是一串快速连续音符（32 分、64 分等），实际演奏时是**扫**过
+而非逐个敲击。`--resample S/T` 把「S 分音及更密」的连续音符重采样到 T 分音：
+密集段内按 T 分网格（相对段首）每隔一段保留一记。
 
-- S 分音符时长 = `240/(BPM×S)` 秒；相邻音符间隔不超过该时长即视为同一密集段。
-- 密集段内按 `240/(BPM×T)` 的网格保留音符（如 32/16 每隔一个 32 分留一个）。
-- BPM 变化时按当前位置的 BPM 计算阈值；`S/T` 需满足 `0 < T < S`。
-- 默认不启用（省略 `--resample` 时不处理）。
+- S 分音符时长 = `240/(BPM×S)` 秒；相邻音符间隔不超过该时长即视为同一密集段
+- BPM 变化时按当前位置的 BPM 计算阈值；需满足 `0 < T < S`
+- 默认不启用
 
 ```bash
-# 把 32 分音及更密集（扫键）降采样到 16 分音
 python simai2midi.py maidata.txt --all -O out/ --resample 32/16
-
-# 更激进：64 分音降采样到 16 分音
-python simai2midi.py maidata.txt --all -O out/ --resample 64/16
+python simai2midi.py maidata.txt --all -O out/ --resample 64/16   # 更激进
 ```
+
+## 输出文件
+
+以 `maidata.txt` + `-d 6` 为例，产物同名不同后缀：
+
+```
+maidata.mid          # 拍手节奏 MIDI（所有模式都会生成）
+maidata.musicxml     # 打击乐单线谱，MuseScore 可直接打开
+maidata.pdf          # 排版好的 PDF 乐谱
+```
+
+用 `-O out/` 批量导出时，文件名取自 `&title` 与难度名，例如
+`インターネットサバイバー_Master.mid`。`--pdf` 单独使用时 MusicXML 只作
+临时中间文件，用完即删。
 
 ## 支持的 simai 语法
 
@@ -84,62 +176,95 @@ python simai2midi.py maidata.txt --all -O out/ --resample 64/16
   连结 SLIDE `1-4q7-2[1:2]`（计 1 个音符，时长相加）
 - TOUCH / TOUCH HOLD：`B1`、`D4`、`C`（`C1`/`C2` 归一为 `C`）、`E1h[4:3]`、花火 `B7f`
 - EACH：`1/8h[2:1]`、纯 TAP 简写 `12`
-- 伪 EACH：`1`2`3/4`（每级延后 1ms）
+- 伪 EACH：`` 1`2`3/4 ``（每级延后 1ms）
 - 星形抑制 `?` / `!`、星形转普通 TAP `@`
 - 终止符 `E`、`||` 行注释、正文内换行与空白
 
-## 时间轴处理
+## 常见问题
 
-解析器先把每个音符换算为绝对秒数（含 `first` 偏移），再由 `TickMap`
-做分段线性的秒 → tick 映射，使 MIDI tempo 事件与谱面 BPM 变化对齐。
-tick 分辨率为 480/拍。
+**Q：MuseScore 打开 MusicXML 报「不完整小节」？**
+默认路径已经不会了。这个报错的根源是 music21 生成的连音记谱是「补丁式」的
+（连音组被非连音元素切断），MuseScore 按记谱值重算小节长度时就会算错并把
+整个小节挪位——实测经它再导出的 MIDI 只有 66.7% 的拍点正确。
+本项目在按**拍**整组重写记谱之后，MuseScore 4 打开无报错、其导出的音频与
+MIDI 完全一致。极端谱面若仍有提示，可退到 `--score-binary`（完全不产生连音，
+代价是三连音被展开成等值音符）。
 
-## 非 ASCII 曲名
+**Q：报 `no library called "cairo-2" was found`？**
+`cairosvg` 需要系统 libcairo：macOS `brew install cairo`，
+Debian/Ubuntu `apt install libcairo2`。装好后仍报错时，确认
+`/opt/homebrew/lib`（macOS ARM）在 `DYLD_FALLBACK_LIBRARY_PATH` 里。
 
-日文/中文曲名需要特别处理，工具已内置：
+**Q：只想要 MIDI，不想装一堆乐谱依赖？**
+不传 `--musicxml` / `--pdf` 就不会导入 `music21` 等库——乐谱相关的 import
+全部延迟到调用时，装 `requirements.txt`（仅 `mido`）即可。
 
-- mido 的 `MidiFile` 默认 `charset='latin1'`，`_save` 用
-  `with meta_charset(self.charset)` 包裹写出，所以改模块级 `_charset`
-  无效，必须设实例的 `charset`。`midi_writer.save_midi()` 负责这件事。
-- 写出采用「临时文件 + `os.replace`」的原子方式。直接 `mf.save()` 若在
-  编码 track_name 时抛错，会留下只含 14 字节 MThd 头的损坏 .mid，
-  后续读取报 `EOFError`。
-- **读回时也要显式指定** `mido.MidiFile(path, charset="utf-8")`，
-  否则 track_name 会按 latin-1 解码成乱码。音符数据不受影响。
+**Q：日文 / 中文曲名会乱码吗？**
+不会。`midi_writer.save_midi()` 会显式设置 mido 的 `charset='utf-8'`
+（模块级设置无效，必须设在 `MidiFile` 实例上），并用「临时文件 + `os.replace`」
+原子写出，避免编码异常留下损坏的半截 `.mid`。
 
-## 测试与校验
+**Q：哪里下载谱面？**
+本项目**不附带任何谱面数据**（见下方版权说明）。谱面可从
+[adxdls.saop.cc](https://adxdls.saop.cc/charts) 等社区镜像获取；
+simai 语法参考 [simai wiki](https://w.atwiki.jp/simai/pages/1002.html)。
 
-```bash
-python test_simai_parser.py                          # 29 项解析器测试（用例取自官方文档）
-python test_midi_writer.py                           # 10 项写出测试（含非 ASCII 曲名、尾判开关与原子保存）
-python verify_midi.py <maidata.txt> <难度> <out.mid>  # 单文件回读比对
-python verify_all.py                                 # 批量回读 samples/ 与 out/
+## 项目结构
+
+```
+simai2midi.py        # 命令行入口
+simai_parser.py      # simai 语法解析 → 带绝对秒数的音符对象
+slide_geometry.py    # 滑星几何：按钮位置、弧线方向、路径长度
+midi_writer.py       # 音符 → 打击乐 MIDI（TickMap 秒→tick 分段线性映射）
+score_writer.py      # 音符 → MusicXML → verovio SVG → cairosvg PDF
+verify_midi.py       # 单文件回读比对
+verify_all.py        # 批量回读比对
+test_*.py            # 单元测试（直接 python test_xxx.py 运行，无需 pytest）
+docs/                # 演示视频、技术笔记、原版 README 备份
 ```
 
-`verify_*.py` 会重新解析源谱，把 MIDI 里读回的 note_on 绝对秒数与解析
-结果逐一比对，同时检查通道与音色。
+## 测试
 
-实测结果（`verify_all.py`，36 个谱面 / 0 失败 / 0 解析警告）：
+仓库不附带谱面样本，自测请准备自己的 `maidata.txt`：
 
-| 谱面 | 难度数 | 最大时间误差 |
-| --- | --- | --- |
-| AMABIE | 4 | 0.205 ms |
-| HECATONCHEIR（6 段 BPM 变化） | 4 | 0.163 ms |
-| アンビバレンス | 5 | 0.313 ms |
-| シスターシスター | 4 | 0.164 ms |
-| Absolute Queen | 4 | 0.262 ms |
-| Inverted World | 4 | 0.252 ms |
-| Cryogenic | 2 | 0.416 ms |
-| PANDORA PARADOXXX | 5 | 0.612 ms |
-| インターネットサバイバー | 4 | 0.315 ms |
+```bash
+python test_simai_parser.py      # 解析器
+python test_midi_writer.py       # MIDI 写出（含非 ASCII 曲名、尾判开关、原子保存）
+python test_score_writer.py      # 乐谱记谱
+python verify_midi.py maidata.txt 6 out.mid   # 单文件回读比对
+python verify_all.py             # 批量回读比对
+```
 
-误差来源是 480 tick/拍的量化，最大 0.6 ms 仍远低于任何听感阈值。
+`verify_*.py` 会重新解析源谱，把 MIDI 里读回的 note_on 绝对秒数与解析结果逐一
+比对，同时检查通道与音色。误差来源是 480 tick/拍 的量化，实测最大 **0.6 ms**
+（45 份谱面全量校验 0 失败），远低于任何听感阈值。
 
-## 文件
+## 已知限制
 
-- `simai_parser.py` — simai 语法解析，输出带绝对秒数的 `Note` 列表
-- `slide_geometry.py` — 滑星几何：按钮位置、弧线方向、路径长度（用于命中点展开）
-- `midi_writer.py` — `TickMap` 时间映射与打击乐 MIDI 生成
-- `simai2midi.py` — CLI 入口
-- `test_simai_parser.py` / `test_midi_writer.py` / `verify_midi.py` / `verify_all.py` — 测试与校验
-- `samples/` — 测试用谱面；`out/` — 生成的 MIDI
+- `--score-binary` 逃生通道在个别谱面上会出现小节时值溢出（例如 PANDORA
+  PARADOXXX 的 50/51 小节）。默认路径不受影响，此选项仅为兼容性兜底。
+- 乐谱默认量化到 192 分网格（10 tick）。改用 `--score-grid 64` 会让三连音系
+  时值写错，除非你确定该谱面没有三连音分工。
+- PDF 排版使用 verovio 默认布局，标题区由本项目自己注入 SVG（verovio 内嵌
+  字体没有 CJK 字形）。
+
+## 技术笔记
+
+实现细节（music21 导出器的坑、连音整拍成组、verovio/cairosvg 的渲染问题、
+量化网格的取舍、各项实测数据）都在
+[docs/README.original.md](docs/README.original.md)。
+
+## 致谢与许可
+
+- 本项目代码以 [MIT 许可证](LICENSE) 发布。
+- 解析思路参考了 [MajdataView / MajdataViewX](https://github.com/LingFeng-bbben/MajdataView)
+  等社区实现。
+- 乐谱排版依赖 [verovio](https://www.verovio.org/)（记谱渲染）与
+  [music21](https://web.mit.edu/music21/)（MusicXML 生成）。
+
+### 版权说明
+
+**本项目不包含任何 maimai 谱面数据、曲目音频或游戏素材。**
+maimai / 舞萌 DX 的曲目、谱面与相关素材版权归 **SEGA** 所有；
+请勿把谱面数据或游戏音频提交进本仓库。演示视频中的曲目仅用于功能演示，
+音频已做衰减处理。

@@ -24,7 +24,7 @@ CRASH = 49
 TAMBOURINE = 54
 COWBELL = 56
 
-# 默认：全部拍手（Sensei 指定）
+# 默认：全部拍手（需要按音符类型分轨时用 --distinct）
 DEFAULT_MAP: Dict[str, int] = {
     "tap": HAND_CLAP,
     "hold": HAND_CLAP,
