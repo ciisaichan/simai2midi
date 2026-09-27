@@ -61,6 +61,20 @@ def collect_charts(data: Dict[str, str], body: Optional[str],
     return [(d, data[f"inote_{d}"]) for d in picked]
 
 
+def _resample_spec(s: str) -> Tuple[int, int]:
+    """解析 --resample 的 "S/T" 参数为 (source_div, target_div)。"""
+    if "/" not in s:
+        raise argparse.ArgumentTypeError(f"需要 S/T 格式（如 32/16），得到 {s!r}")
+    a, _, b = s.partition("/")
+    try:
+        src, tgt = int(a), int(b)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"无法解析为整数: {s!r}")
+    if src <= 0 or tgt <= 0 or tgt >= src:
+        raise argparse.ArgumentTypeError(f"需满足 0 < T < S（如 32/16），得到 {s!r}")
+    return (src, tgt)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="把 maimai simai 谱面转换为拍手打击乐 MIDI")
@@ -84,6 +98,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="滑星弧线（> < ^）展开沿途每个按钮（更密集的滚奏）")
     p.add_argument("--tails", action="store_true",
                    help="包含 HOLD / SLIDE 的尾判音（默认不含）")
+    p.add_argument("--resample", type=_resample_spec, default=None, metavar="S/T",
+                   help="把 S 分音及更密集的连续音符重采样到 T 分音"
+                        "（如 32/16 将 32 分降为 16 分；默认不处理）")
     p.add_argument("--velocity", type=int, default=100, help="普通音符力度")
     p.add_argument("--break-velocity", type=int, default=127,
                    help="BREAK 音符力度")
@@ -92,7 +109,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def convert_one(body: str, slot: int, args, data: Dict[str, str],
-                out_path: str) -> Tuple[int, simai_parser.ParseResult]:
+                out_path: str) -> Tuple[int, int, simai_parser.ParseResult]:
+    """转换单个难度。返回 (原始音符数, 合并后音符数, ParseResult)。"""
     first = 0.0
     if not args.no_offset:
         if args.first is not None:
@@ -112,6 +130,11 @@ def convert_one(body: str, slot: int, args, data: Dict[str, str],
     clean = simai_parser.strip_comments(body)
     result = simai_parser.parse_chart(clean, first=first, default_bpm=bpm,
                                       dense=args.slide_dense)
+    original = len(result.notes)
+    if args.resample:
+        src, tgt = args.resample
+        result.notes = simai_parser.resample_dense_notes(
+            result.notes, src, tgt, result.bpm_changes)
     title = data.get("title", os.path.basename(args.input)).strip()
     label = f"{title} [{DIFF_NAMES.get(slot, 'chart')}]" if slot else title
     mf = midi_writer.build_midi(
@@ -124,7 +147,7 @@ def convert_one(body: str, slot: int, args, data: Dict[str, str],
         title=label)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     midi_writer.save_midi(mf, out_path)
-    return len(result.notes), result
+    return original, len(result.notes), result
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -144,7 +167,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             suffix = f"_{DIFF_NAMES.get(slot, 'chart')}" if slot else ""
             out_path = os.path.join(args.outdir,
                                     f"{_safe(title)}{suffix}.mid")
-        count, result = convert_one(chart_body, slot, args, data, out_path)
+        original, count, result = convert_one(chart_body, slot, args, data,
+                                              out_path)
         if args.quiet:
             print(out_path)
             continue
@@ -153,7 +177,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             kinds[n.kind] = kinds.get(n.kind, 0) + 1
         detail = " ".join(f"{k}={v}" for k, v in sorted(kinds.items()))
         hits = midi_writer.count_hits(result.notes, tails=args.tails)
-        print(f"{out_path}: {count} notes / {hits} 拍手点 ({detail}), "
+        merged = ""
+        if args.resample:
+            src, tgt = args.resample
+            merged = f" (重采样{src}→{tgt}分音: {original}→{count})"
+        print(f"{out_path}: {count} notes / {hits} 拍手点{merged} ({detail}), "
               f"时长 {result.end_time:.2f}s, "
               f"BPM 段 {len(result.bpm_changes)}")
         for w in result.warnings[:10]:

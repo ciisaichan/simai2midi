@@ -402,3 +402,52 @@ def parse_maidata(text: str) -> Dict[str, str]:
         elif key is not None:
             data[key] = data[key] + "\n" + line
     return data
+
+
+def bpm_at_time(bpm_changes: List[Tuple[float, float]], t: float) -> float:
+    """返回 t 时刻生效的 BPM（默认 120）。"""
+    bpm = 120.0
+    for bt, b in bpm_changes:
+        if bt <= t + 1e-9:
+            bpm = b
+        else:
+            break
+    return bpm
+
+
+def resample_dense_notes(notes: List[Note], source_div: int,
+                         target_div: int,
+                         bpm_changes: List[Tuple[float, float]]) -> List[Note]:
+    """把 source_div 分音及更密集的连续音符重采样到 target_div 分音。
+
+    例：source=32、target=16 时，一串 32 分音符降为 16 分音符——密集段内
+    按 16 分网格（相对段首）每隔一个保留，既简化节奏又保留足够的节拍参考。
+    source_div/target_div 无效（<=0 或 target >= source）时原样返回。
+    返回新列表，不修改原列表。
+    """
+    if not notes or not source_div or not target_div or target_div >= source_div:
+        return list(notes)
+    ordered = sorted(notes, key=lambda n: n.time)
+    result: List[Note] = [ordered[0]]
+    prev_time = ordered[0].time
+    run_start = ordered[0].time
+    last_grid = 0
+    for n in ordered[1:]:
+        bpm = bpm_at_time(bpm_changes, n.time)
+        src_int = 240.0 / (bpm * source_div)
+        tgt_int = 240.0 / (bpm * target_div)
+        gap = n.time - prev_time
+        if gap <= src_int + 1e-6:
+            # 密集段：按 target 网格重采样（相对段首）
+            g = int((n.time - run_start) / tgt_int + 1e-9)
+            if g > last_grid:
+                result.append(n)
+                last_grid = g
+            prev_time = n.time
+        else:
+            # 新的密集段（或孤立音）
+            result.append(n)
+            prev_time = n.time
+            run_start = n.time
+            last_grid = 0
+    return result

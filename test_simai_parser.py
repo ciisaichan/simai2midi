@@ -161,6 +161,58 @@ def test_arc_hat_is_short_way():
     assert n.slide_nodes == ["1", "2", "3", "4"]
 
 
+def test_resample_32_to_16():
+    """一串 32 分音符，32/16 重采样后每隔一个保留（8→4）。"""
+    r = notes("(120){32}" + "1," * 8 + "E")
+    assert len(r.notes) == 8
+    merged = sp.resample_dense_notes(r.notes, 32, 16, r.bpm_changes)
+    assert len(merged) == 4
+    # 保留索引 0、2、4、6 的音
+    assert merged[0].time == r.notes[0].time
+    assert merged[1].time == r.notes[2].time
+    assert merged[2].time == r.notes[4].time
+    assert merged[3].time == r.notes[6].time
+
+
+def test_resample_64_to_16():
+    """16 个 64 分音符，64/16 重采样后为 4 个 16 分音符。"""
+    r = notes("(120){64}" + "1," * 16 + "E")
+    assert len(r.notes) == 16
+    merged = sp.resample_dense_notes(r.notes, 64, 16, r.bpm_changes)
+    assert len(merged) == 4
+
+
+def test_resample_leaves_normal_notes():
+    """4 分音符间隔，32/16 不处理。"""
+    r = notes("(120){4}" + "1," * 4 + "E")
+    merged = sp.resample_dense_notes(r.notes, 32, 16, r.bpm_changes)
+    assert len(merged) == 4
+
+
+def test_resample_16th_notes_untouched():
+    """16 分音符本身不密集，32/16 不改动。"""
+    r = notes("(120){16}" + "1," * 8 + "E")
+    merged = sp.resample_dense_notes(r.notes, 32, 16, r.bpm_changes)
+    assert len(merged) == 8
+
+
+def test_resample_resets_after_gap():
+    """两个密集段被长间隔隔开，各自重采样。"""
+    body = "(120){32}" + "1," * 8 + "{4}," + "{32}" + "2," * 8 + "E"
+    r = notes(body)
+    merged = sp.resample_dense_notes(r.notes, 32, 16, r.bpm_changes)
+    assert len(merged) == 8  # 两段各 8→4
+    assert merged[0].position == "1" and merged[4].position == "2"
+
+
+def test_resample_invalid_returns_copy():
+    """source/target 无效时原样返回等长新列表。"""
+    r = notes("(120){32}" + "1," * 8 + "E")
+    assert len(sp.resample_dense_notes(r.notes, 0, 16, r.bpm_changes)) == 8
+    assert len(sp.resample_dense_notes(r.notes, 16, 32, r.bpm_changes)) == 8
+    assert len(sp.resample_dense_notes(r.notes, 32, 32, r.bpm_changes)) == 8
+
+
 def test_touch_and_touch_hold():
     r = notes("(120)B1,D4,C,E1h[4:3],Chf[1:2],B7f,E")
     kinds = [(n.kind, n.position) for n in r.notes]

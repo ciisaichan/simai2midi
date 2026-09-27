@@ -35,6 +35,7 @@ python simai2midi.py inote.simai --bpm 174 --first 1.234 -o out.mid
 | `--hold-sustain` | HOLD / TOUCH HOLD 按真实时长持续（默认短促一击） |
 | `--tails` | 包含 HOLD / SLIDE 的尾判音（默认不含） |
 | `--slide-dense` | 滑星弧线（`>` `<` `^`）展开沿途每个按钮（更密集的滚奏） |
+| `--resample S/T` | 把 S 分音及更密集的连续音符重采样到 T 分音（如 32/16；默认不处理） |
 | `--velocity` / `--break-velocity` | 力度（默认 100 / 127） |
 
 ### 节奏命中（拍手点）与尾判
@@ -51,6 +52,26 @@ python simai2midi.py inote.simai --bpm 174 --first 1.234 -o out.mid
 
 `--distinct` 的音色分配：TAP=39 拍手、HOLD=56 牛铃、SLIDE=54 铃鼓、
 TOUCH=42 闭合踩镲、TOUCH HOLD=46 开放踩镲、BREAK=49 碰铃。
+
+### 扫键重采样（`--resample S/T`）
+
+maimai 谱面里的「扫键」是一串快速连续音符（32 分、64 分等），实际演奏时
+是扫过而非逐个敲击。`--resample S/T` 会把「S 分音及更密集」的连续音符
+**重采样到 T 分音**：密集段内按 T 分网格（相对段首）每隔一段保留一拍，
+既简化了节奏，又比「只留第一个」保留更多节拍参考。
+
+- S 分音符时长 = `240/(BPM×S)` 秒；相邻音符间隔不超过该时长即视为同一密集段。
+- 密集段内按 `240/(BPM×T)` 的网格保留音符（如 32/16 每隔一个 32 分留一个）。
+- BPM 变化时按当前位置的 BPM 计算阈值；`S/T` 需满足 `0 < T < S`。
+- 默认不启用（省略 `--resample` 时不处理）。
+
+```bash
+# 把 32 分音及更密集（扫键）降采样到 16 分音
+python simai2midi.py maidata.txt --all -O out/ --resample 32/16
+
+# 更激进：64 分音降采样到 16 分音
+python simai2midi.py maidata.txt --all -O out/ --resample 64/16
+```
 
 ## 支持的 simai 语法
 
@@ -89,7 +110,7 @@ tick 分辨率为 480/拍。
 ## 测试与校验
 
 ```bash
-python test_simai_parser.py                          # 23 项解析器测试（用例取自官方文档）
+python test_simai_parser.py                          # 29 项解析器测试（用例取自官方文档）
 python test_midi_writer.py                           # 10 项写出测试（含非 ASCII 曲名、尾判开关与原子保存）
 python verify_midi.py <maidata.txt> <难度> <out.mid>  # 单文件回读比对
 python verify_all.py                                 # 批量回读 samples/ 与 out/
