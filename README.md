@@ -1,13 +1,13 @@
 # simai2midi — maimai 谱面转打击乐节奏谱
 
-把 **maimai（舞萌 DX）的 simai 谱面**转换成三样东西：
+English see [README.en.md](README.en.md)
+
+把 **maimai 的 simai 谱面**转换成三样东西：
 
 1. **打击乐 MIDI** —— 每一记对应一次拍手（GM 打击乐通道 9 / Hand Clap 39），
    可直接当节奏参考轨、练习素材，或喂给 DAW 与制谱软件
 2. **MusicXML 节奏谱** —— 打击乐单线谱，一个符头 = 一记，**MuseScore 可直接打开**
 3. **PDF 节奏谱** —— 由 MusicXML 排版渲染，适合打印或分享
-
-一句话用途：**把「屏幕上的谱面」变成「能听、能打、能打印的节奏轨」。**
 
 [![演示视频](docs/demo-poster.png)](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)
 

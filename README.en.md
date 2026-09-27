@@ -1,15 +1,14 @@
 # simai2midi — maimai charts → percussion rhythm tracks
 
-Convert **maimai (舞萌 DX) simai charts** into three things:
+中文说明见 [README.md](README.md)。
+
+Convert **maimai simai charts** into three things:
 
 1. **Percussion MIDI** — every hit becomes a hand clap on GM drum channel 9
    (note 39). Drop it into a DAW as a rhythm reference or practice track.
 2. **MusicXML rhythm score** — single-line percussion staff, one notehead per
    hit, opens cleanly in **MuseScore**.
 3. **PDF rhythm score** — typeset from the MusicXML, ready to print or share.
-
-In one sentence: **turn "a chart on screen" into "a rhythm track you can hear,
-count, and print".**
 
 [![Demo video](docs/demo-poster.png)](https://github.com/ciisaichan/simai2midi/releases/download/v1.0.0/demo.mp4)
 
@@ -28,8 +27,6 @@ count, and print".**
 
 All footage and music belong to their respective creators and SEGA; it is shown
 for illustration only and the audio has been attenuated.
-
-中文说明见 [README.md](README.md)。
 
 ## Features
 
