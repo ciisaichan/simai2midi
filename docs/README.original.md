@@ -1,5 +1,11 @@
 # simai2midi
 
+> **这是开源整理之前的原版 README，作为历史备份保留。**
+> 其中的部分行为说明已过时——最明显的是滑星「经过键」：本文档写作时（v1.0.0）
+> 默认把 V 型 `via` 与连结段中间键也展开成拍手点，现在默认**只给星头**
+> （与官方物量口径一致），需要滚奏才用 `--slide-dense`。
+> 以此为准：[README.md](../README.md) / [README.en.md](../README.en.md)。
+
 把 maimai 街机谱面（simai 记谱 / maidata.txt）转换为打击乐 MIDI。
 所有音符默认映射到 GM 打击乐通道的 Hand Clap（拍手，note 39）。
 

@@ -98,7 +98,7 @@ python simai2midi.py maidata.txt -d 6 --resample 32/16
 | `--first SEC` / `--no-offset` | 覆盖 / 忽略 `&first` 起始偏移 |
 | `--distinct` | 按音符类型分配不同打击音色，便于在 DAW 里区分 |
 | `--hold-sustain` | HOLD / TOUCH HOLD 按真实时长持续（默认短促一击） |
-| `--slide-dense` | 滑星弧线（`> < ^`）展开沿途每个按钮（更密集的滚奏） |
+| `--slide-dense` | 滑星展开**全部经过键**（V 型 via、连结段中间键、弧线沿途按钮）成滚奏；默认一条 slide 只给星头 |
 | `--tails` | 包含 HOLD / SLIDE 的尾判音（默认不含） |
 | `--resample S/T` | 把 S 分音及更密集的连续音符重采样到 T 分音（如 `32/16`；默认不处理） |
 | `--musicxml` | 同时导出节奏谱 MusicXML（`*.musicxml`） |
@@ -116,7 +116,9 @@ python simai2midi.py maidata.txt -d 6 --resample 32/16
 
 - TAP / TOUCH：1 点（头）
 - HOLD / TOUCH HOLD：1 点（头）；加 `--tails` 时再加尾判（结束时刻）
-- SLIDE：头 + 经过键（连结 SLIDE 的中间键、大 V 的 via）；加 `--tails` 时再加终点尾判
+- SLIDE：**默认只给星头**——一条 slide 在游戏里只算 1 个 note（官方物量口径），
+  V 的 via 与连结段的中间键只是路径途经点；加 `--slide-dense` 才展开成滚奏，
+  加 `--tails` 时再加终点尾判
 
 默认（不含尾判）导出的是一份**纯打击节奏**——与游戏判定里每个需要按下的时刻对应。
 
@@ -252,6 +254,13 @@ python verify_all.py             # 批量回读比对
 实现细节（music21 导出器的坑、连音整拍成组、verovio/cairosvg 的渲染问题、
 量化网格的取舍、各项实测数据）都在
 [docs/README.original.md](docs/README.original.md)。
+
+## 变更记录
+
+- **v1.0.1** —— 滑星的经过键（V 型 `via`、连结段中间键）不再默认展开成拍手点：
+  一条 slide 只给 1 个点，与官方物量口径一致，8–32ms 的双击消失。
+  [更新说明](docs/release-notes-v1.0.1.md)
+- **v1.0.0** —— 首次公开发布。[更新说明](docs/release-notes-v1.0.0.md)
 
 ## 致谢与许可
 

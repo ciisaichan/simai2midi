@@ -107,7 +107,7 @@ containing only the chart body.
 | `--first SEC` / `--no-offset` | Override / ignore the `&first` offset |
 | `--distinct` | Different drum sounds per note type (easier to tell apart in a DAW) |
 | `--hold-sustain` | HOLD / TOUCH HOLD sustain for their real length (default: one short hit) |
-| `--slide-dense` | Expand every button along a slide (`> < ^`) |
+| `--slide-dense` | Expand a slide into a full roll: every passing key (V `via`, chain junctions, arc buttons). By default a slide yields just its star head |
 | `--tails` | Include HOLD / SLIDE tail hits (default: off) |
 | `--resample S/T` | Resample S-th-note-and-denser runs to T-th notes (e.g. `32/16`) |
 | `--musicxml` | Also write a MusicXML score (`*.musicxml`) |
@@ -125,8 +125,9 @@ Each note expands into one or more "hits":
 
 - TAP / TOUCH: 1 hit (the head)
 - HOLD / TOUCH HOLD: 1 hit; with `--tails`, plus the release moment
-- SLIDE: head + every intermediate button (chain-slide middles, big-V vias);
-  with `--tails`, plus the endpoint
+- SLIDE: **the star head only** — in-game a slide counts as a single note, and a
+  V `via` or chain junction is merely a waypoint on the path; `--slide-dense`
+  expands it into a full roll, and `--tails` adds the endpoint
 
 Without `--tails` you get a pure percussion rhythm — exactly the moments the
 game asks you to press something.
@@ -262,6 +263,14 @@ Implementation details — the music21 exporter pitfalls, per-beat tuplet
 rebuilding, verovio/cairosvg rendering issues, the quantisation grid trade-off,
 and all measured numbers — live in [docs/README.original.md](docs/README.original.md)
 (written in Chinese).
+
+## Changelog
+
+- **v1.0.1** — slide passing keys (a V `via`, a chain junction) are no longer
+  expanded into hits by default: one slide now yields one hit, matching the
+  official note count, and the 8–32ms double-hits are gone.
+  [Release notes](docs/release-notes-v1.0.1.md)
+- **v1.0.0** — first public release. [Release notes](docs/release-notes-v1.0.0.md)
 
 ## Credits and licence
 

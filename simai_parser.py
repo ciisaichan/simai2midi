@@ -172,8 +172,10 @@ def _parse_slide_chain(start: str, chunk: str, lengths: List[str],
                        warnings: List[str], dense: bool) -> Tuple[Optional[Note], int]:
     """解析一条（可能是连结）SLIDE。返回 (Note, 新的长度游标)。
 
-    命中点 = 星星头 + 每条段的经过键（V 的 via、连结的中间键）+ 终点；
-    dense=True 时弧线（> < ^）额外展开沿途每个按钮。
+    命中点 = 星星头 + 每条段的经过键（V 的 via、连结的中间键）+ 终点。
+    dense=True 时保留全部经过键，弧线还会展开沿途每个按钮（滚奏）；
+    dense=False（默认）只留星头与终点，与游戏「一条 slide 计 1 个 note」
+    的物量口径一致，避免途经点落在网格外与邻近 TAP 撞成双击。
     """
     # (shape, end, via, length_spec)
     segments: List[Tuple[str, int, Optional[int], Optional[str]]] = []
@@ -255,6 +257,15 @@ def _parse_slide_chain(start: str, chunk: str, lengths: List[str],
         if seg_durs is not None:
             cum_time += sd
         cur = end
+
+    # 非 dense：只保留星头与真正的终点。V 型的 via 与连结段的中间键都只是
+    # 路径上的途经点——游戏里一条 slide 仍按 1 个 note 计（官方物量口径），
+    # 把它们展开成拍手点会落在 192 分网格之外（时间按路径长度比例算出），
+    # 与邻近 TAP 形成 8~32ms 的双击，听感就是「不规律的节拍」。
+    # 需要完整滚奏时用 --slide-dense 展开全部经过键。
+    if not dense and len(nodes) > 2:
+        nodes = [nodes[0], nodes[-1]]
+        hit_times = [hit_times[0], hit_times[-1]]
 
     note = Note(time, "slide", start, duration=total_dur, wait=wait,
                 is_break=is_break, is_ex=is_ex,
@@ -341,7 +352,8 @@ def parse_chart(body: str, first: float = 0.0,
                 default_bpm: float = 120.0, dense: bool = False) -> ParseResult:
     """解析 simai 谱面正文，返回带绝对秒数的 Note 列表。
 
-    dense=True 时滑星弧线（> < ^）展开沿途每个按钮（更密集的滚奏）。
+    dense=True 时滑星保留全部经过键，弧线（> < ^）还会展开沿途每个按钮
+    （更密集的滚奏）；dense=False（默认）一条 slide 只给星头与终点。
     """
     result = ParseResult()
     state: Dict[str, float] = {"bpm": default_bpm, "div": 4.0,

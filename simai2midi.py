@@ -98,7 +98,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--hold-sustain", action="store_true",
                    help="HOLD/TOUCH HOLD 按真实时长持续（默认短促一击）")
     p.add_argument("--slide-dense", action="store_true",
-                   help="滑星弧线（> < ^）展开沿途每个按钮（更密集的滚奏）")
+                   help="滑星展开全部经过键（V 型 via、连结段中间键、弧线沿途"
+                        "按钮）成滚奏；默认一条 slide 只给星头，与官方物量口径"
+                        "一致（终点尾判由 --tails 补）")
     p.add_argument("--tails", action="store_true",
                    help="包含 HOLD / SLIDE 的尾判音（默认不含）")
     p.add_argument("--resample", type=_resample_spec, default=None, metavar="S/T",

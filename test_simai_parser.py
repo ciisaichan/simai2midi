@@ -136,15 +136,24 @@ def test_slide_hit_nodes_and_times():
     approx(n.slide_hit_times[1], n.wait + n.duration)
 
 
-def test_chained_slide_hit_nodes_include_junctions():
-    """连结滑星：头 + 每个中间键 + 尾。"""
+def test_chained_slide_default_gives_only_head_and_end():
+    """默认（dense=False）：连结滑星的中间键不是独立 note，只留星头与终点。"""
     n = notes("(120)1-4q7-2[1:2],E").notes[0]
-    assert n.slide_nodes == ["1", "4", "7", "2"]
+    assert n.slide_nodes == ["1", "2"]
+    assert len(n.slide_hit_times) == 2
+    approx(n.slide_hit_times[0], n.time)
+    approx(n.slide_hit_times[1], n.end_time)
+    # dense=True 时才展开中间键（滚奏）
+    n_dense = sp.parse_chart("(120)1-4q7-2[1:2],E", dense=True).notes[0]
+    assert n_dense.slide_nodes == ["1", "4", "7", "2"]
 
 
-def test_big_v_slide_hit_nodes_include_via():
+def test_big_v_slide_default_gives_only_head_and_end():
+    """V 型的 via 同理：默认不给，dense=True 才给。"""
     n = notes("(120)1V35[8:3],E").notes[0]
-    assert n.slide_nodes == ["1", "3", "5"]
+    assert n.slide_nodes == ["1", "5"]
+    n_dense = sp.parse_chart("(120)1V35[8:3],E", dense=True).notes[0]
+    assert n_dense.slide_nodes == ["1", "3", "5"]
 
 
 def test_dense_arc_expands_intermediate_buttons():
